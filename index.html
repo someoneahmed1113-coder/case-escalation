@@ -49,6 +49,7 @@
       <div class="app-name">منصة تصعيد الحالات<small>إدارة التنسيق الطبي بالتجمع</small></div>
       <span class="spacer"></span>
       <span class="user" id="userName"></span>
+      <button class="btn btn-ghost btn-sm" id="pwBtn" type="button">كلمة المرور</button>
       <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">خروج</button>
     </div>
   </header>
@@ -66,6 +67,18 @@
         </a>
       </div>
     </div>
+
+    <form class="card sec" id="pwForm" hidden novalidate style="margin-bottom:18px">
+      <div class="sec-head"><span>تغيير كلمة المرور</span></div>
+      <div class="sec-body">
+        <div class="grid">
+          <label class="field"><span>كلمة المرور الجديدة</span><input type="password" id="pw1" autocomplete="new-password" dir="ltr" minlength="8"></label>
+          <label class="field"><span>تأكيد كلمة المرور</span><input type="password" id="pw2" autocomplete="new-password" dir="ltr"></label>
+        </div>
+        <div class="party-actions"><button class="btn btn-primary" type="submit" id="pwSave">حفظ كلمة المرور</button><button class="btn btn-ghost" type="button" id="pwCancel">إلغاء</button></div>
+        <p class="hint" style="margin:0;color:var(--muted);font-size:13px">8 أحرف على الأقل.</p>
+      </div>
+    </form>
 
     <p class="notice warn" id="notStaff" hidden>حسابك غير مسجّل ضمن فريق التنسيق الطبي. تواصل مع مسؤول المنصة لإضافتك.</p>
 
@@ -167,6 +180,18 @@
     try { await api.signIn($('#email').value.trim(), $('#password').value); await boot(); }
     catch (ex) { err.textContent = errText(ex); err.hidden = false; }
     finally { btn.disabled = false; btn.textContent = 'دخول'; }
+  });
+  $('#pwBtn').addEventListener('click', () => { const f = $('#pwForm'); f.hidden = !f.hidden; if (!f.hidden) $('#pw1').focus(); });
+  $('#pwCancel').addEventListener('click', () => { $('#pwForm').hidden = true; $('#pwForm').reset(); });
+  $('#pwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const a = $('#pw1').value, b = $('#pw2').value;
+    if (a.length < 8) { toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل', true); return; }
+    if (a !== b) { toast('كلمتا المرور غير متطابقتين', true); return; }
+    $('#pwSave').disabled = true;
+    try { await api.changePassword(a); toast('تم تغيير كلمة المرور'); $('#pwForm').reset(); $('#pwForm').hidden = true; }
+    catch (ex) { toast(errText(ex), true); }
+    finally { $('#pwSave').disabled = false; }
   });
   $('#logoutBtn').addEventListener('click', async () => { if (unsub) { unsub(); unsub = null; } await api.signOut(); boot(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#appView').hidden) load(); });

@@ -47,6 +47,7 @@
     async session() { return load().signedIn ? { user: ME } : null; },
     async signIn() { load().signedIn = true; save(); return { user: ME }; },
     async signOut() { load().signedIn = false; save(); },
+    async changePassword() { return true; },
     async me() { return load().signedIn ? ME : null; },
     async listRequests() {
       const db = load();

@@ -302,6 +302,7 @@
     async session() { return unwrap(await sb.auth.getSession()).session; },
     async signIn(email, password) { return unwrap(await sb.auth.signInWithPassword({ email, password })); },
     async signOut() { await sb.auth.signOut(); },
+    async changePassword(password) { return unwrap(await sb.auth.updateUser({ password })); },
     async me() {
       const s = await this.session(); if (!s) return null;
       const rows = unwrap(await sb.from('staff').select('full_name, phone, active').eq('user_id', s.user.id));
