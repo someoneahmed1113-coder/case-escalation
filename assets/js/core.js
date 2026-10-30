@@ -68,8 +68,8 @@
     return m;
   }
 
-  // اسم المستخدم بدون @ يتحول إلى بريد داخلي (مثال: coordination → coordination@case.test)
-  const LOGIN_DOMAIN = cfg.LOGIN_DOMAIN || 'case.test';
+  // اسم المستخدم بدون @ يتحول إلى بريد داخلي (مثال: coordination → coordination@case.local)
+  const LOGIN_DOMAIN = cfg.LOGIN_DOMAIN || 'case.local';
   function loginEmail(v) {
     const s = String(v || '').trim().toLowerCase();
     return s.includes('@') ? s : `${s}@${LOGIN_DOMAIN}`;
