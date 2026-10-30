@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تصعيد الحالات | التنسيق الطبي</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#15508A">
+<link rel="icon" href="assets/img/favicon.png">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+
+<!-- تسجيل الدخول -->
+<div class="login" id="loginView" hidden>
+  <div class="login-art">
+    <img src="assets/img/logo-white.webp" alt="تجمع الحدود الشمالية الصحي">
+    <div>
+      <h1>منصة تصعيد الحالات</h1>
+      <p>توثيق ومتابعة الحالات التي تواجه تحديات وتحتاج إلى الدعم والتوجيه، من إنشاء الطلب حتى انتهاء التصعيد.</p>
+      <div class="steps">
+        <div><b class="n">1</b><span>التنسيق الطبي ينشئ الطلب ويرسله للمستشفى المعني عبر الواتساب.</span></div>
+        <div><b class="n">2</b><span>الطبيب المعالج يكتب الرأي الطبي ويوقّع من الرابط مباشرة.</span></div>
+        <div><b class="n">3</b><span>التنسيق يتابع ويرفع لقائد المسار أو إدارة المستشفيات حتى يكتمل النموذج موثّقاً بالتواقيع.</span></div>
+      </div>
+    </div>
+    <small style="opacity:.7">إدارة التنسيق الطبي بالتجمع</small>
+  </div>
+  <div class="login-form">
+    <form id="loginForm" novalidate>
+      <div>
+        <h2>دخول التنسيق الطبي</h2>
+      </div>
+      <p class="sub">الدخول مخصص لفريق التنسيق الطبي فقط.</p>
+      <label class="field"><span>البريد الإلكتروني</span><input type="email" id="email" autocomplete="username" required dir="ltr"></label>
+      <label class="field"><span>كلمة المرور</span><input type="password" id="password" autocomplete="current-password" required dir="ltr"></label>
+      <button class="btn btn-primary" type="submit" id="loginBtn">دخول</button>
+      <p class="notice warn" id="demoNote" hidden>نسخة عرض تجريبية: اضغط «دخول» بدون بيانات. البيانات تُحفظ في هذا المتصفح فقط.</p>
+      <p class="notice warn" id="loginErr" hidden></p>
+    </form>
+  </div>
+</div>
+
+<!-- لوحة الطلبات -->
+<div id="appView" hidden>
+  <header class="topbar">
+    <div class="topbar-in">
+      <img class="logo" src="assets/img/logo-white.webp" alt="تجمع الحدود الشمالية الصحي">
+      <div class="app-name">منصة تصعيد الحالات<small>إدارة التنسيق الطبي بالتجمع</small></div>
+      <span class="spacer"></span>
+      <span class="user" id="userName"></span>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">خروج</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="page-head">
+      <div>
+        <h1>الطلبات</h1>
+        <p id="subline">جميع طلبات التصعيد مرتبة من الأحدث.</p>
+      </div>
+      <div class="actions">
+        <a class="btn btn-primary" href="request.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          طلب جديد
+        </a>
+      </div>
+    </div>
+
+    <p class="notice warn" id="notStaff" hidden>حسابك غير مسجّل ضمن فريق التنسيق الطبي. تواصل مع مسؤول المنصة لإضافتك.</p>
+
+    <div class="stats" id="stats" role="group" aria-label="تصفية حسب الحالة"></div>
+
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="بحث برقم الطلب أو الإحالة أو المستشفى أو التخصص" aria-label="بحث">
+      <select id="period" aria-label="الفترة">
+        <option value="">كل الفترات</option>
+        <option value="1">آخر 24 ساعة</option>
+        <option value="7">آخر 7 أيام</option>
+        <option value="30">آخر 30 يوماً</option>
+      </select>
+    </div>
+
+    <div class="card list" id="list" aria-live="polite"></div>
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/core.js"></script>
+<script>
+(function () {
+  const { $, esc, api, OUTCOMES, PARTIES, pill, fmtDate, fmtTime, serialLabel, toast, errText } = App;
+  let all = [], filter = '', unsub = null;
+
+  async function boot() {
+    let me = null;
+    try { me = await api.me(); } catch (e) { toast(errText(e), true); }
+    $('#loginView').hidden = !!me;
+    $('#appView').hidden = !me;
+    $('#demoNote').hidden = !App.DEMO;
+    if (!me) { $('#email').focus(); return; }
+    $('#userName').textContent = me.full_name || me.email;
+    if (me.notStaff) { $('#notStaff').hidden = false; }
+    await load();
+    if (!unsub) unsub = api.subscribe(debounce(load, 400));
+  }
+
+  function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+  async function load() {
+    try { all = await api.listRequests(); render(); }
+    catch (e) { toast(errText(e), true); }
+  }
+
+  function partyChips(rs) {
+    const live = (rs || []).filter((p) => !p.revoked_at);
+    if (!live.length) return '<span class="dot">لم يُرسل بعد</span>';
+    return live.map((p) => {
+      const st = p.submitted_at ? 'ok' : p.opened_at ? 'seen' : '';
+      const word = p.submitted_at ? 'وقّع' : p.opened_at ? 'فتح الرابط' : 'بانتظار';
+      return `<span class="dot ${st}" title="${esc(p.party_label)}">${esc(PARTIES[p.party_type])}: ${word}</span>`;
+    }).join('');
+  }
+
+  function render() {
+    // ملخص الحالات
+    const counts = Object.fromEntries(OUTCOMES.map((o) => [o.v, 0]));
+    all.forEach((r) => { counts[r.outcome] = (counts[r.outcome] || 0) + 1; });
+    const colors = { 's-progress': '#B7791F', 's-awaiting': 'var(--navy)', 's-directed': 'var(--brand)', 's-solved': '#2F8F2F', 's-closed': 'var(--petrol)' };
+    $('#stats').innerHTML = `<button type="button" class="stat" data-f="" aria-pressed="${filter === ''}"><b class="num">${all.length}</b><span>كل الطلبات</span></button>` +
+      OUTCOMES.map((o) => `<button type="button" class="stat" data-f="${esc(o.v)}" aria-pressed="${filter === o.v}" style="--c:${colors[o.cls]}"><b class="num">${counts[o.v]}</b><span>${esc(o.v)}</span></button>`).join('');
+
+    const q = $('#q').value.trim().toLowerCase();
+    const days = +$('#period').value;
+    const since = days ? Date.now() - days * 864e5 : 0;
+    const rows = all.filter((r) => (!filter || r.outcome === filter)
+      && (!since || new Date(r.created_at).getTime() >= since)
+      && (!q || [serialLabel(r.serial), r.serial, r.referral_no, r.hospital_name, r.specialty, r.case_type].join(' ').toLowerCase().includes(q)));
+
+    $('#subline').textContent = filter ? `الطلبات بحالة «${filter}»: ${rows.length}` : `جميع طلبات التصعيد مرتبة من الأحدث (${rows.length}).`;
+
+    if (!rows.length) {
+      $('#list').innerHTML = `<div class="empty"><img src="assets/img/logo.webp" alt="" style="width:120px">${all.length ? 'لا توجد طلبات مطابقة للبحث.' : 'لا توجد طلبات بعد. ابدأ بإنشاء أول طلب تصعيد.'}${all.length ? '' : '<a class="btn btn-primary" href="request.html">طلب جديد</a>'}</div>`;
+      return;
+    }
+    $('#list').innerHTML = rows.map((r) => `
+      <a class="row-item" href="request.html?id=${encodeURIComponent(r.id)}">
+        <div class="serial num">${serialLabel(r.serial)}<small>${fmtDate(r.created_at)}</small></div>
+        <div class="main">
+          <div class="title">${esc(r.specialty || 'بدون تخصص')}${r.case_type ? `<span class="badge ${r.case_type === 'إنقاذ حياة' ? 'red' : ''}">${esc(r.case_type)}</span>` : ''}</div>
+          <div class="meta"><span>${esc(r.hospital_name || '—')}</span>${r.referral_no ? `<span>إحالة: <span class="num">${esc(r.referral_no)}</span></span>` : ''}<span>${fmtTime(r.created_at)}</span></div>
+        </div>
+        <div class="side">${pill(r.outcome)}<div class="parties">${partyChips(r.responses)}</div></div>
+      </a>`).join('');
+  }
+
+  $('#stats').addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; render(); });
+  $('#q').addEventListener('input', render);
+  $('#period').addEventListener('change', render);
+
+  $('#loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('#loginBtn'), err = $('#loginErr');
+    err.hidden = true; btn.disabled = true; btn.textContent = 'جاري الدخول...';
+    try { await api.signIn($('#email').value.trim(), $('#password').value); await boot(); }
+    catch (ex) { err.textContent = errText(ex); err.hidden = false; }
+    finally { btn.disabled = false; btn.textContent = 'دخول'; }
+  });
+  $('#logoutBtn').addEventListener('click', async () => { if (unsub) { unsub(); unsub = null; } await api.signOut(); boot(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#appView').hidden) load(); });
+
+  boot();
+})();
+</script>
+</body>
+</html>

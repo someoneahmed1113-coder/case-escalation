@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نموذج تصعيد الحالات</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#15508A">
+<link rel="icon" href="assets/img/favicon.png">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+<header class="hero-mini">
+  <div class="in">
+    <img src="assets/img/logo-white.webp" alt="تجمع الحدود الشمالية الصحي">
+    <div>
+      <h1 id="title">نموذج تصعيد الحالات</h1>
+      <p id="subtitle">الحالات التي تواجه تحديات وتحتاج إلى الدعم والتوجيه</p>
+    </div>
+  </div>
+</header>
+
+<main class="wrap narrow stack" id="main">
+  <div class="card sec" id="loading"><div class="sec-body">جاري تحميل النموذج...</div></div>
+</main>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/core.js"></script>
+<script>
+(function () {
+  const A = App, { $, esc, api, fmtDateTime, serialLabel, toast, errText } = A;
+  const token = new URLSearchParams(location.search).get('t') || '';
+  let data = null, sig = null;
+  const draftKey = 'esc-draft-' + token.slice(0, 16);
+
+  function kv(label, val, wide) {
+    return `<div class="${wide ? 'wide' : ''}"><dt>${esc(label)}</dt><dd>${val ? val : '<span style="color:var(--muted);font-weight:400">—</span>'}</dd></div>`;
+  }
+
+  function answerBlock(o) {
+    const isH = o.type === 'hospital';
+    return `<article class="party">
+      <div class="party-head"><div class="who"><b>${esc(o.type_label)}${isH ? '' : ': ' + esc(o.label)}</b><small>${isH ? esc(o.label) + ' | ' : ''}<span class="num">${fmtDateTime(o.submitted_at)}</span></small></div><span class="dot ok">موقّع</span></div>
+      <div class="party-body">
+        ${isH ? `<div class="answer"><h4>الرأي الطبي ورد الطبيب المعالج</h4><p>${esc(o.medical_opinion)}</p></div>${o.action_taken ? `<div class="answer"><h4>الإجراء المتخذ</h4><p>${esc(o.action_taken)}</p></div>` : ''}`
+              : `<div class="answer"><h4>الإفادة</h4><p>${esc(o.statement)}</p></div>`}
+        <div class="signed">${o.signature ? `<img src="${o.signature}" alt="">` : ''}<div class="by"><b>${esc(o.responder_name)}</b>${esc(o.responder_title || '')}</div></div>
+      </div></article>`;
+  }
+
+  function render() {
+    const r = data.request, p = data.party, isH = p.type === 'hospital';
+    $('#title').innerHTML = `نموذج تصعيد حالة <span class="num">${serialLabel(r.serial)}</span>`;
+    $('#subtitle').textContent = `مرسل إلى: ${p.type_label}${isH || p.type === 'other' ? ' - ' + p.label : ''}`;
+    document.title = `نموذج تصعيد ${serialLabel(r.serial)}`;
+
+    const c937 = r.c937_contacted == null ? '' : r.c937_contacted ? `تم التواصل${r.c937_at ? ' في <span class="num">' + fmtDateTime(r.c937_at) + '</span>' : ''}${r.c937_code ? ' | رمز الكود: <span class="num">' + esc(r.c937_code) + '</span>' : ''}` : 'لم يتم التواصل';
+
+    const caseCard = `
+      <section class="card sec">
+        <div class="sec-head"><span>بيانات الحالة</span><span class="tag">من التنسيق الطبي | للاطلاع فقط</span></div>
+        <div class="sec-body">
+          <dl class="kv" style="margin:0">
+            ${kv('التخصص المطلوب', esc(r.specialty))}
+            ${kv('تصنيف الحالة', esc(r.case_type))}
+            ${kv('رقم الإحالة', r.referral_no ? `<span class="num">${esc(r.referral_no)}</span>` : '')}
+            ${kv('وقت بداية الإجراءات', r.started_at ? `<span class="num">${fmtDateTime(r.started_at)}</span>` : '')}
+            ${kv('المستشفى المعني', esc(r.hospital_name))}
+            ${kv('مشرف التنسيق الطبي', `${esc(r.supervisor_name || '')}${r.supervisor_phone ? ` <span class="num">${esc(r.supervisor_phone)}</span>` : ''}`)}
+            ${kv('توجيه مركز اتصال الطوارئ 1937', c937 + (r.c937_direction ? '<br>' + esc(r.c937_direction) : ''), true)}
+            ${r.support_request ? kv('الدعم / التوجيه المطلوب', esc(r.support_request), true) : ''}
+          </dl>
+        </div>
+      </section>`;
+
+    const others = data.others.length ? `
+      <section class="card sec">
+        <div class="sec-head"><span>ردود الجهات السابقة</span><span class="tag">موقّعة | للاطلاع فقط</span></div>
+        <div class="sec-body">${data.others.map(answerBlock).join('')}</div>
+      </section>` : '';
+
+    let mine;
+    if (p.submitted_at) {
+      mine = `
+        <p class="notice ok">تم توقيع الرد وإرساله إلى التنسيق الطبي في <span class="num">${fmtDateTime(p.submitted_at)}</span>. شكراً لتعاونكم.</p>
+        <section class="card sec"><div class="sec-head"><span>ردّكم</span></div><div class="sec-body">${answerBlock(p)}</div></section>
+        <div class="party-actions"><button class="btn btn-ghost" type="button" id="pdfBtn">تصدير PDF</button></div>`;
+    } else {
+      const d = loadDraft();
+      mine = `
+        <form class="card sec" id="respForm" novalidate>
+          <div class="sec-head"><span>${isH ? 'المستشفى المعني بالحالة' : 'إفادة ' + esc(p.type_label)}</span><span class="tag">تعبّئها جهتكم</span></div>
+          <div class="sec-body">
+            ${isH ? `
+              <label class="field"><span>الإدارة الطبية / الطبيب المعالج <b class="req">*</b><span class="hint"> الرأي الطبي ورد الطبيب المعالج</span></span><textarea id="medical_opinion" rows="4" required>${esc(d.medical_opinion)}</textarea></label>
+              <label class="field"><span>الإجراء المتخذ<span class="hint"> الإجراءات التي تمت والجهات التي تم التواصل معها، وتاريخ ووقت كل إجراء</span></span><textarea id="action_taken" rows="4">${esc(d.action_taken)}</textarea></label>`
+            : `
+              <label class="field"><span>الإفادة <b class="req">*</b><span class="hint"> الرد والتوجيه وتفاصيل التواصل</span></span><textarea id="statement" rows="5" required>${esc(d.statement)}</textarea></label>`}
+            <div class="grid">
+              <label class="field"><span>${isH ? 'اسم الطبيب' : 'الاسم'} <b class="req">*</b></span><input type="text" id="responder_name" required value="${esc(d.responder_name)}"></label>
+              <label class="field"><span>${isH ? 'المسمى الوظيفي / التخصص' : 'المسمى الوظيفي / الجهة'}</span><input type="text" id="responder_title" value="${esc(d.responder_title)}"></label>
+            </div>
+            <div class="field"><span>التوقيع <b class="req">*</b></span><button type="button" class="sigbox" id="sigBtn"></button></div>
+            <p class="notice warn" id="confirmBox" hidden>بعد الإرسال لا يمكن تعديل الرد. راجع البيانات ثم اضغط «تأكيد الإرسال».</p>
+            <div class="party-actions">
+              <button class="btn btn-primary" type="submit" id="sendBtn">توقيع وإرسال</button>
+              <button class="btn btn-ghost" type="button" id="backBtn" hidden>مراجعة</button>
+            </div>
+          </div>
+        </form>`;
+    }
+
+    $('#main').innerHTML = caseCard + others + mine + `
+      <ul class="policy">
+        <li>بيانات التنسيق الطبي وردود الجهات الأخرى للاطلاع فقط ولا يمكن تعديلها.</li>
+        <li>عدم إدراج بيانات شخصية غير لازمة والاكتفاء برقم الإحالة والبيانات وفق سياسة الخصوصية المعتمدة.</li>
+        <li>للاستفسار: مشرف التنسيق المناوب بالتجمع <span class="num">${A.DEFAULT_SUPERVISOR_PHONE}</span></li>
+      </ul>`;
+
+    if (p.submitted_at) {
+      $('#pdfBtn').addEventListener('click', printMine);
+    } else {
+      A.bindSignatureBox($('#sigBtn'), { title: isH ? 'توقيع الطبيب المعالج' : 'التوقيع', subtitle: 'وقّع داخل المساحة البيضاء ثم اضغط «اعتماد التوقيع»', getValue: () => sig, setValue: (v) => { sig = v; } });
+      const f = $('#respForm');
+      f.addEventListener('input', saveDraft);
+      f.addEventListener('submit', onSubmit);
+      $('#backBtn').addEventListener('click', () => { $('#confirmBox').hidden = true; $('#backBtn').hidden = true; $('#sendBtn').textContent = 'توقيع وإرسال'; f.dataset.confirm = ''; });
+    }
+  }
+
+  function val(id) { const el = $('#' + id); return el ? el.value.trim() : null; }
+  function fields() {
+    return { medical_opinion: val('medical_opinion'), action_taken: val('action_taken'), statement: val('statement'), responder_name: val('responder_name'), responder_title: val('responder_title') };
+  }
+  function loadDraft() { try { return JSON.parse(localStorage.getItem(draftKey) || '{}'); } catch (e) { return {}; } }
+  function saveDraft() { try { localStorage.setItem(draftKey, JSON.stringify(fields())); } catch (e) { /* اختياري */ } }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    const f = fields(), form = e.target, isH = data.party.type === 'hospital';
+    if (isH && !f.medical_opinion) { toast('اكتب الرأي الطبي', true); $('#medical_opinion').focus(); return; }
+    if (!isH && !f.statement) { toast('اكتب الإفادة', true); $('#statement').focus(); return; }
+    if (!f.responder_name) { toast('اكتب الاسم', true); $('#responder_name').focus(); return; }
+    if (!sig) { toast('التوقيع مطلوب، اضغط على خانة التوقيع', true); $('#sigBtn').focus(); return; }
+    if (!form.dataset.confirm) {
+      form.dataset.confirm = '1'; $('#confirmBox').hidden = false; $('#backBtn').hidden = false; $('#sendBtn').textContent = 'تأكيد الإرسال';
+      $('#confirmBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const b = $('#sendBtn'); b.disabled = true; b.textContent = 'جاري الإرسال...';
+    try {
+      await api.submitForm(token, { ...f, signature: sig });
+      try { localStorage.removeItem(draftKey); } catch (x) { /* اختياري */ }
+      await load();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (ex) { toast(errText(ex), true); b.disabled = false; b.textContent = 'تأكيد الإرسال'; }
+  }
+
+  function printMine() {
+    const r = data.request, p = data.party;
+    const asRow = (o) => ({ party_type: o.type, party_label: o.label, medical_opinion: o.medical_opinion, action_taken: o.action_taken, statement: o.statement,
+      responder_name: o.responder_name, responder_title: o.responder_title, signature: o.signature, submitted_at: o.submitted_at });
+    A.printSheet(r, [...data.others.map(asRow), asRow(p)].sort((a, b) => String(a.submitted_at).localeCompare(String(b.submitted_at))));
+  }
+
+  async function load() {
+    if (!token) { fail('الرابط غير مكتمل. تأكد من فتح الرابط كما وصلك في الرسالة.'); return; }
+    try { data = await api.getForm(token); render(); }
+    catch (e) { fail(errText(e)); }
+  }
+  function fail(msg) {
+    $('#main').innerHTML = `<div class="card sec"><div class="sec-body"><p class="notice warn" style="margin:0">${esc(msg)}</p><p style="margin:0;color:var(--muted)">للتواصل مع مشرف التنسيق المناوب: <span class="num">${A.DEFAULT_SUPERVISOR_PHONE}</span></p></div></div>`;
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
