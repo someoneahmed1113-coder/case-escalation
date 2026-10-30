@@ -63,9 +63,16 @@
 
   function errText(e) {
     const m = (e && (e.message || e.error_description)) || String(e);
-    if (/Invalid login credentials/i.test(m)) return 'البريد أو كلمة المرور غير صحيحة';
+    if (/Invalid login credentials/i.test(m)) return 'اسم المستخدم أو كلمة المرور غير صحيحة';
     if (/Failed to fetch|NetworkError/i.test(m)) return 'تعذّر الاتصال بالخادم، تحقق من الإنترنت وحاول مرة أخرى';
     return m;
+  }
+
+  // اسم المستخدم بدون @ يتحول إلى بريد داخلي (مثال: coordination → coordination@case.test)
+  const LOGIN_DOMAIN = cfg.LOGIN_DOMAIN || 'case.test';
+  function loginEmail(v) {
+    const s = String(v || '').trim().toLowerCase();
+    return s.includes('@') ? s : `${s}@${LOGIN_DOMAIN}`;
   }
 
   // يحوّل الجوال السعودي إلى الصيغة الدولية لرابط واتساب
@@ -344,7 +351,7 @@
   window.App = {
     DEMO, OUTCOMES, PARTIES, SPECIALTIES, DEFAULT_SUPERVISOR_PHONE,
     $, $$, esc, fmtDate, fmtTime, fmtDateTime, toLocalInput, fromLocalInput, serialLabel, outcomeClass, pill,
-    toast, errText, waLink, copyText, respondUrl, inviteText,
+    toast, errText, loginEmail, waLink, copyText, respondUrl, inviteText,
     openSignaturePad, bindSignatureBox, renderPrintSheet, printSheet, api,
   };
 })();

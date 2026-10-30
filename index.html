@@ -32,7 +32,7 @@
         <h2>دخول التنسيق الطبي</h2>
       </div>
       <p class="sub">الدخول مخصص لفريق التنسيق الطبي فقط.</p>
-      <label class="field"><span>البريد الإلكتروني</span><input type="email" id="email" autocomplete="username" required dir="ltr"></label>
+      <label class="field"><span>اسم المستخدم</span><input type="text" id="email" autocomplete="username" autocapitalize="none" spellcheck="false" required dir="ltr"></label>
       <label class="field"><span>كلمة المرور</span><input type="password" id="password" autocomplete="current-password" required dir="ltr"></label>
       <button class="btn btn-primary" type="submit" id="loginBtn">دخول</button>
       <p class="notice warn" id="demoNote" hidden>نسخة عرض تجريبية: اضغط «دخول» بدون بيانات. البيانات تُحفظ في هذا المتصفح فقط.</p>
@@ -177,7 +177,7 @@
     e.preventDefault();
     const btn = $('#loginBtn'), err = $('#loginErr');
     err.hidden = true; btn.disabled = true; btn.textContent = 'جاري الدخول...';
-    try { await api.signIn($('#email').value.trim(), $('#password').value); await boot(); }
+    try { await api.signIn(App.loginEmail($('#email').value), $('#password').value); await boot(); }
     catch (ex) { err.textContent = errText(ex); err.hidden = false; }
     finally { btn.disabled = false; btn.textContent = 'دخول'; }
   });
